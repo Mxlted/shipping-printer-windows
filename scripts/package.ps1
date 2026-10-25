@@ -1,11 +1,11 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param()
+param([switch]$SkipChecks)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path $PSScriptRoot -Parent
-& (Join-Path $PSScriptRoot 'build.ps1')
+& (Join-Path $PSScriptRoot 'build.ps1') -SkipChecks:$SkipChecks
 Push-Location $projectRoot
 try {
     $projectFile = 'src/ShippingPrinter.Windows/ShippingPrinter.Windows.csproj'

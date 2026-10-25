@@ -58,6 +58,8 @@ pwsh ./scripts/package.ps1
 
 The versioned ZIP and its SHA-256 checksum go to `dist/`. The checks exercise image and PDF handling, barcode round trips, settings, and printer payloads without discovering devices or sending print jobs. A passing check run does not establish compatibility with a particular printer.
 
+GitHub Actions verifies compilation and packaging. The WPF/WinRT integration checks run on a Windows desktop; hosted server runners have a documented [native shutdown limitation](tests/ShippingPrinter.Checks/README.md#hosted-runners).
+
 The application is C# and WPF, with Windows PDF rendering and ZXing.Net for barcodes. Source lives in `src/`; the check runner is in `tests/`. Build outputs and local investigation files are excluded from the repository.
 
 ## Local data

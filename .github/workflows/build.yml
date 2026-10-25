@@ -15,12 +15,21 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Check for the pinned SDK
+        id: sdk
+        shell: pwsh
+        run: |
+          $version = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
+          $installed = @(dotnet --list-sdks | Where-Object { $_.StartsWith("$version ") }).Count -gt 0
+          "installed=$($installed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
       - uses: actions/setup-dotnet@v6.0.0
+        if: steps.sdk.outputs.installed != 'true'
         with:
           global-json-file: global.json
-      - name: Build, check and package
+      # Desktop integration checks run locally; see tests/ShippingPrinter.Checks/README.md.
+      - name: Build and package
         shell: pwsh
-        run: ./scripts/package.ps1
+        run: ./scripts/package.ps1 -SkipChecks
       - name: Save portable package
         uses: actions/upload-artifact@v7.0.2
         with:
@@ -29,17 +38,3 @@ jobs:
             dist/*.zip
             dist/*.sha256
           if-no-files-found: error
-      - name: Save check results
-        if: always()
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: check-results
-          path: artifacts/checks/checks.json
-          if-no-files-found: warn
-      - name: Show application errors on failure
-        if: failure()
-        shell: pwsh
-        run: |
-          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10); Level=2} -ErrorAction SilentlyContinue |
-            Where-Object ProviderName -In @('.NET Runtime', 'Application Error', 'Windows Error Reporting') |
-            Select-Object TimeCreated, ProviderName, Message | Format-List

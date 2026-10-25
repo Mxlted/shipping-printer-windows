@@ -21,6 +21,8 @@ dotnet run --project ./tests/ShippingPrinter.Checks -c Release -r win-x64 --self
 
 The runner writes its results and generated fixtures under `artifacts/`. It does not discover Bluetooth devices or print. For a separate app profile, set `SHIPPING_PRINTER_DATA` to a temporary directory before launching.
 
+Hosted CI builds and packages the app. Desktop integration checks must also pass locally; see the [hosted runner limitation](tests/ShippingPrinter.Checks/README.md#hosted-runners). Do not suppress a nonzero check-process exit code, even if its assertions passed.
+
 ## Making a change
 
 - Keep pull requests focused on one problem, and explain the behavior before and after the change.
