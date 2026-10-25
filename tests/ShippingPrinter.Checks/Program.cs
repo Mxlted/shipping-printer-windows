@@ -7,7 +7,6 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using ShippingPrinter.Windows;
 using ShippingPrinter.Windows.Models;
 using ShippingPrinter.Windows.Services;
@@ -26,10 +25,11 @@ internal static class Program
         Directory.CreateDirectory(Artifacts);
         var previousDataPath = Environment.GetEnvironmentVariable("SHIPPING_PRINTER_DATA");
         Environment.SetEnvironmentVariable("SHIPPING_PRINTER_DATA", Path.Combine(Artifacts, "settings"));
-        var dispatcher = Dispatcher.CurrentDispatcher;
-        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+        // Use WPF's application lifecycle so its rendering and dispatcher resources
+        // shut down in the same order as the desktop app, without opening a window.
+        var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         int exit = 2;
-        dispatcher.BeginInvoke(new Action(async () =>
+        application.Startup += async (_, _) =>
         {
             try
             {
@@ -54,11 +54,12 @@ internal static class Program
                 File.WriteAllText(Path.Combine(Artifacts, "checks.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
                 Console.WriteLine($"{report.Passed} passed; {report.Failed} failed. Report: {Path.Combine(Artifacts, "checks.json")}");
                 Environment.SetEnvironmentVariable("SHIPPING_PRINTER_DATA", previousDataPath);
-                dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+                application.Shutdown(exit);
             }
-        }));
-        Dispatcher.Run();
-        return exit;
+        };
+        int actualExit = application.Run();
+        Console.WriteLine($"WPF application shutdown completed; returning exit code {actualExit}.");
+        return actualExit;
     }
 
     private static async Task RunChecksAsync()
