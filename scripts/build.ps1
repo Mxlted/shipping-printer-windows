@@ -14,7 +14,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     if (-not $SkipChecks) {
         dotnet run --project tests/ShippingPrinter.Checks/ShippingPrinter.Checks.csproj -c Release --no-build -- artifacts/checks
-        if ($LASTEXITCODE -ne 0) { throw 'Offline checks failed.' }
+        if ($LASTEXITCODE -ne 0) { throw "Offline checks process exited with code $LASTEXITCODE (0x$('{0:X8}' -f $LASTEXITCODE)). See artifacts/checks/checks.json." }
     }
 } finally {
     Pop-Location

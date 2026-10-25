@@ -36,3 +36,10 @@ jobs:
           name: check-results
           path: artifacts/checks/checks.json
           if-no-files-found: warn
+      - name: Show application errors on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10); Level=2} -ErrorAction SilentlyContinue |
+            Where-Object ProviderName -In @('.NET Runtime', 'Application Error', 'Windows Error Reporting') |
+            Select-Object TimeCreated, ProviderName, Message | Format-List
