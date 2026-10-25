@@ -41,7 +41,7 @@ The OFFNOVA BLE workflow is user-reported working. Hardware revisions can differ
 
 ## Build from source
 
-Use Windows x64, PowerShell 7, and the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) selected by `global.json` (10.0.402 or a later servicing patch). The first restore needs access to NuGet.
+Use Windows x64, PowerShell 7, and [.NET SDK 10.0.402](https://dotnet.microsoft.com/download/dotnet/10.0), pinned in `global.json`. The first restore needs access to NuGet.
 
 ```powershell
 git clone https://github.com/Mxlted/shipping-printer-windows.git
