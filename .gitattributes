@@ -8,5 +8,6 @@
 *.yml text eol=lf
 *.json text eol=lf
 *.png binary
+*.jpg binary
 *.ico binary
 *.rtf binary
