@@ -1,0 +1,27 @@
+name: Bug report
+description: Something is not working as expected.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the steps to reproduce, what you expected, and the app version.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 25H2, x64
+    validations:
+      required: true
+  - type: textarea
+    id: printer
+    attributes:
+      label: Printer and connection
+      description: For printing issues, include the model, connection mode, paper size, and DPI. Leave out Bluetooth addresses and device identifiers.
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Error text or a screenshot can help. Remove addresses, tracking numbers, barcodes, and other private label data before uploading.

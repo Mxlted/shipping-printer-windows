@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build, check and package
+        shell: pwsh
+        run: ./scripts/package.ps1
+      - name: Save portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShippingPrinter-win-x64
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+      - name: Save check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-results
+          path: artifacts/checks/checks.json
+          if-no-files-found: warn

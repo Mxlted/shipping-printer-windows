@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ShippingPrinter</AssemblyName>
+    <RootNamespace>ShippingPrinter.Windows</RootNamespace>
+    <Version>1.2.0</Version>
+    <Authors>Mxlted</Authors>
+    <Product>Shipping Printer</Product>
+    <Description>A local label-printing workspace for Windows, with OFFNOVA N-6140 Bluetooth support.</Description>
+    <Copyright>Copyright (c) 2026 Mxlted</Copyright>
+    <RepositoryUrl>https://github.com/Mxlted/shipping-printer-windows</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><Resource Include="Assets/app.ico" /></ItemGroup>
+  <ItemGroup><PackageReference Include="ZXing.Net" Version="0.16.11" /></ItemGroup>
+</Project>

@@ -1,0 +1,18 @@
+# Build output and local working data
+**/bin/
+**/obj/
+artifacts/
+dist/
+.local/
+.vs/
+.idea/
+*.user
+*.suo
+*.log
+
+# Research inputs and generated investigation files are never distributed.
+analysis/
+*.ipa
+*.pdb
+.DS_Store
+Thumbs.db
