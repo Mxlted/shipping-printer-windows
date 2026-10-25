@@ -3,7 +3,7 @@
 From the repository root:
 
 ```powershell
-dotnet run --project tests/ShippingPrinter.Checks/ShippingPrinter.Checks.csproj --configuration Release -- artifacts
+dotnet run --project tests/ShippingPrinter.Checks/ShippingPrinter.Checks.csproj --configuration Release --runtime win-x64 --self-contained true -- artifacts
 ```
 
 The runner uses an STA thread and a windowless WPF application, so Windows PDF rendering and shutdown follow the desktop app's lifecycle. It writes `artifacts/checks.json` and small generated PNG/PDF/TSPL fixtures. Settings are isolated in `artifacts/settings` through `SHIPPING_PRINTER_DATA`; the original environment value is restored when the runner finishes.

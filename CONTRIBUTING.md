@@ -16,7 +16,7 @@ dotnet run --project ./src/ShippingPrinter.Windows -c Release
 The build script restores locked dependencies, builds in Release, and runs the offline checks. To run only the checks:
 
 ```powershell
-dotnet run --project ./tests/ShippingPrinter.Checks -c Release -- ./artifacts
+dotnet run --project ./tests/ShippingPrinter.Checks -c Release -r win-x64 --self-contained true -- ./artifacts
 ```
 
 The runner writes its results and generated fixtures under `artifacts/`. It does not discover Bluetooth devices or print. For a separate app profile, set `SHIPPING_PRINTER_DATA` to a temporary directory before launching.
