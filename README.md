@@ -4,7 +4,7 @@ Print shipping labels from a native Windows workspace, including wireless printi
 
 **[Download for Windows x64](https://github.com/Mxlted/shipping-printer-windows/releases/latest)** · [Printer setup](docs/printers.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-![Shipping Printer in dark mode with label thumbnails and print settings](docs/images/workspace-redesign-dark.jpg)
+![Shipping Printer in dark mode with a sample shipping label and print settings](docs/images/workspace-dark.png)
 
 ## Get started
 
