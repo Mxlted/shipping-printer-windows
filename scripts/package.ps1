@@ -1,11 +1,22 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([switch]$SkipChecks)
+param(
+    [switch]$SkipChecks,
+    [string]$InnoSetupCompiler
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path $PSScriptRoot -Parent
+if (-not $InnoSetupCompiler) {
+    $InnoSetupCompiler = Join-Path $projectRoot '.local/tools/inno-6.7.3/ISCC.exe'
+}
+if (-not (Test-Path -LiteralPath $InnoSetupCompiler -PathType Leaf)) {
+    throw 'Inno Setup compiler not found. Run scripts/install-inno.ps1 or pass -InnoSetupCompiler with the path to ISCC.exe.'
+}
+$InnoSetupCompiler = (Resolve-Path -LiteralPath $InnoSetupCompiler).Path
 & (Join-Path $PSScriptRoot 'build.ps1') -SkipChecks:$SkipChecks
+$stagingRoot = $null
 Push-Location $projectRoot
 try {
     $projectFile = 'src/ShippingPrinter.Windows/ShippingPrinter.Windows.csproj'
@@ -45,13 +56,29 @@ try {
     foreach ($required in @('ShippingPrinter.exe', 'ShippingPrinter.dll', 'coreclr.dll', 'PresentationFramework.dll', 'licenses/Microsoft.NETCore.App.Runtime.win-x64-LICENSE.TXT', 'licenses/Microsoft.WindowsDesktop.App.Runtime.win-x64-LICENSE')) {
         if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory $required))) { throw "Missing release file: $required" }
     }
-    $archive = Join-Path $distRoot "$packageName.zip"
-    Compress-Archive -LiteralPath $publishDirectory -DestinationPath $archive -Force
-    $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$digest  $packageName.zip" | Set-Content -LiteralPath "$archive.sha256" -Encoding ascii
-    Write-Host "Portable app: $publishDirectory"
-    Write-Host "Archive:      $archive"
-    Write-Host "SHA-256:      $digest"
+    Compress-Archive -LiteralPath $publishDirectory -DestinationPath (Join-Path $stagingRoot "$packageName.zip")
+    & $InnoSetupCompiler /Qp "/DAppVersion=$version" "/DPublishDirectory=$publishDirectory" `
+        "/DOutputDirectory=$stagingRoot" (Join-Path $projectRoot 'installer/ShippingPrinter.iss')
+    if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
+    # Publish outputs only after both formats have built successfully.
+    foreach ($fileName in @("$packageName.zip", "$packageName-Setup.exe")) {
+        $source = Join-Path $stagingRoot $fileName
+        $destination = Join-Path $distRoot $fileName
+        $digest = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
+        Move-Item -LiteralPath $source -Destination $destination -Force
+        "$digest  $fileName" | Set-Content -LiteralPath "$destination.sha256" -Encoding ascii
+        Write-Host "Package: $destination"
+        Write-Host "SHA-256: $digest"
+    }
 } finally {
+    if ($stagingRoot -and (Test-Path -LiteralPath $stagingRoot)) {
+        $resolvedStaging = (Resolve-Path -LiteralPath $stagingRoot).Path
+        $expectedParent = [IO.Path]::GetFullPath((Join-Path $projectRoot 'dist'))
+        if ((Split-Path $resolvedStaging -Parent) -ne $expectedParent -or
+            (Split-Path $resolvedStaging -Leaf) -notlike '.staging-*') {
+            throw "Refusing to remove unexpected staging path: $resolvedStaging"
+        }
+        Remove-Item -LiteralPath $resolvedStaging -Recurse -Force
+    }
     Pop-Location
 }

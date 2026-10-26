@@ -31,7 +31,9 @@ Hosted CI builds and packages the app. Desktop integration checks must also pass
 - Keep printer writes sequential and explicit. Do not add automatic pairing or retry partially submitted jobs.
 - Include the checks you ran and their results. Distinguish offline checks, live discovery, connection inspection, and physical printing.
 
-Application code belongs in `src/ShippingPrinter.Windows`; offline checks belong in `tests/ShippingPrinter.Checks`. Packaging is handled by `scripts/package.ps1`. Generated files, local profiles, captures, original application packages, and investigation tooling do not belong in a pull request.
+Application code belongs in `src/ShippingPrinter.Windows`; offline checks belong in `tests/ShippingPrinter.Checks`. Packaging is handled by `scripts/package.ps1` and `installer/ShippingPrinter.iss`. Run `scripts/install-inno.ps1` once to install the pinned compiler, then `scripts/package.ps1` to create both release formats. Keep the installer's AppId stable between versions. Generated files, local profiles, captures, original application packages, and investigation tooling do not belong in a pull request.
+
+After packaging changes, run `pwsh ./scripts/check-installer.ps1` on a Windows desktop account without Shipping Printer installed. It verifies the checksums, installs into an isolated directory, compares the installed payload with the ZIP, checks the Start menu and Installed apps registration, launches the app with a temporary profile, reinstalls, and uninstalls. Logs remain under `artifacts/`. It refuses to replace an existing installation.
 
 ## Printer compatibility reports
 

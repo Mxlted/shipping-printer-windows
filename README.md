@@ -8,13 +8,17 @@ Print shipping labels from a native Windows workspace, including wireless printi
 
 ## Get started
 
-1. Download the Windows x64 ZIP from the [latest release](https://github.com/Mxlted/shipping-printer-windows/releases/latest).
-2. Extract the entire folder and open `ShippingPrinter.exe`. The .NET runtime is included.
+1. Download the Windows x64 **Setup.exe** from the [latest release](https://github.com/Mxlted/shipping-printer-windows/releases/latest).
+2. Run the installer, then open **Shipping Printer** from the Start menu. The .NET runtime is included; administrator access is not required.
 3. Import a PDF or image, or choose **Try an example label**.
 4. Choose the paper size, then click the printer under **Destination** to open **Printer setup**.
 5. Review the preview and choose **Print label**.
 
-Windows 11 x64 is recommended. Releases are portable and currently unsigned. Keep all files in the extracted folder together. The app targets Windows 10 build 19041 or newer; older Windows versions have not been release-tested.
+Prefer a portable app? Download the ZIP, extract the entire folder, and open `ShippingPrinter.exe`. Keep the extracted files together.
+
+Windows 11 x64 is recommended. Downloads are currently unsigned. The app targets Windows 10 build 19041 or newer; older Windows versions have not been release-tested.
+
+The installer uses `%LocalAppData%\Programs\Shipping Printer`. Run a newer installer to update it, or remove it through Windows **Installed apps**. Your saved printer and appearance preferences are retained after uninstall.
 
 ### OFFNOVA N-6140 over Bluetooth
 
@@ -50,13 +54,16 @@ pwsh ./scripts/build.ps1
 dotnet run --project ./src/ShippingPrinter.Windows -c Release
 ```
 
-The build script restores locked dependencies, compiles the app, and runs the offline checks. Create a portable release with:
+The build script restores locked dependencies, compiles the app, and runs the offline checks. To create the installer and portable release, install the pinned [Inno Setup](https://jrsoftware.org/isinfo.php) compiler once, then package:
 
 ```powershell
+pwsh ./scripts/install-inno.ps1
 pwsh ./scripts/package.ps1
 ```
 
-The versioned ZIP and its SHA-256 checksum go to `dist/`. The checks exercise image and PDF handling, barcode round trips, settings, and printer payloads without discovering devices or sending print jobs. A passing check run does not establish compatibility with a particular printer.
+The versioned installer, ZIP, and their SHA-256 checksums go to `dist/`. The compiler is installed under `.local/tools`; you can also supply `-InnoSetupCompiler C:\path\to\ISCC.exe`. Temporary packaging files are removed after each run.
+
+The checks exercise image and PDF handling, barcode round trips, settings, and printer payloads without discovering devices or sending print jobs. A passing check run does not establish compatibility with a particular printer.
 
 GitHub Actions verifies compilation and packaging. The WPF/WinRT integration checks run on a Windows desktop; hosted server runners have a documented [native shutdown limitation](tests/ShippingPrinter.Checks/README.md#hosted-runners).
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 · 2026-10-26
+
+- Added a Windows x64 installer with Start menu integration, an optional desktop shortcut, and uninstall support. No administrator access or separate .NET installation is needed.
+- Kept the portable ZIP and added SHA-256 checksums for both downloads.
+- Removed the mobile package and obsolete screenshot from the Windows source tree. Packaging now cleans up its temporary files after each build.
+
 ## 1.3.0 · 2026-10-25
 
 - Redesigned workspace with live label thumbnails, a focused preview canvas, and compact print settings.

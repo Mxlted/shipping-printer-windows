@@ -27,14 +27,18 @@ jobs:
         with:
           global-json-file: global.json
       # Desktop integration checks run locally; see tests/ShippingPrinter.Checks/README.md.
+      - name: Install pinned installer compiler
+        shell: pwsh
+        run: ./scripts/install-inno.ps1
       - name: Build and package
         shell: pwsh
         run: ./scripts/package.ps1 -SkipChecks
-      - name: Save portable package
+      - name: Save release packages
         uses: actions/upload-artifact@v7.0.2
         with:
           name: ShippingPrinter-win-x64
           path: |
             dist/*.zip
+            dist/*-Setup.exe
             dist/*.sha256
           if-no-files-found: error
