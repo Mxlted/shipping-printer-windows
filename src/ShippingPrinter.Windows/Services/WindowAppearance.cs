@@ -16,6 +16,12 @@ public static class WindowAppearance
     private static void OnUseDarkTitleBarChanged(DependencyObject target, DependencyPropertyChangedEventArgs args)
     {
         if (target is not Window window) return;
+
+        // WPF may reset non-client colors while it finishes creating a window.
+        // Apply once the first content frame is ready as well as at handle creation.
+        window.ContentRendered -= OnContentRendered;
+        window.ContentRendered += OnContentRendered;
+
         if (new WindowInteropHelper(window).Handle != IntPtr.Zero)
         {
             Apply(window);
@@ -34,6 +40,13 @@ public static class WindowAppearance
         Apply(window);
     }
 
+    private static void OnContentRendered(object? sender, EventArgs args)
+    {
+        if (sender is not Window window) return;
+        window.ContentRendered -= OnContentRendered;
+        Apply(window);
+    }
+
     private static void Apply(Window window)
     {
         var handle = new WindowInteropHelper(window).Handle;
@@ -44,8 +57,9 @@ public static class WindowAppearance
 
         // Windows 11 supports explicit caption colors. Older systems ignore these
         // attributes and retain their standard title bar without affecting the app.
-        var captionColor = dark ? 0x001C1C1C : 0x00FFFFFF;
-        var textColor = dark ? 0x00F2F2F2 : 0x00202020;
+        // DWM expects COLORREF values in BGR order.
+        var captionColor = dark ? 0x00202020 : 0x00FFFFFF;
+        var textColor = dark ? 0x00ECEEEE : 0x00242626;
         _ = DwmSetWindowAttribute(handle, 35, ref captionColor, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 36, ref textColor, sizeof(int));
     }

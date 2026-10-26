@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ShippingPrinter</AssemblyName>
     <RootNamespace>ShippingPrinter.Windows</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Authors>Mxlted</Authors>
     <Product>Shipping Printer</Product>
     <Description>A local label-printing workspace for Windows, with OFFNOVA N-6140 Bluetooth support.</Description>

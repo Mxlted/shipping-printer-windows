@@ -35,7 +35,7 @@ public sealed class PrinterWindow : Window
     private readonly ComboBox _queues = new();
     private readonly ComboBox _devices = new() { DisplayMemberPath = "Name" };
     private readonly ComboBox _targets = new() { DisplayMemberPath = "DisplayName" };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 16, 0, 0) };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     private readonly TextBlock _help = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 0) };
     private readonly TextBlock _queueHelp = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0), FontSize = 12 };
     private readonly TextBlock _channelHelp = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), FontSize = 12 };
@@ -71,29 +71,27 @@ public sealed class PrinterWindow : Window
         Title = "Printer setup";
         Width = 710; Height = 660; MinHeight = 550; MinWidth = 620;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var panel = new StackPanel { Margin = new Thickness(28) };
-        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        panel.Children.Add(new TextBlock { Text = "Connect your printer", FontSize = 24, FontWeight = FontWeights.SemiBold });
-        var description = new TextBlock { Text = "Choose the connection you want to use for labels.", Margin = new Thickness(0, 10, 0, 18) };
-        description.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
-        panel.Children.Add(description);
+        var panel = new StackPanel { Margin = new Thickness(24, 22, 24, 24) };
+        panel.Children.Add(DialogLayout.FieldLabel("Connection"));
         panel.Children.Add(_mode);
 
-        _classicPanel.Children.Add(new TextBlock
+        var classicInstructions = new TextBlock
         {
             Text = "Use the OFFNOVA name without an LE suffix. Pair it in Windows Bluetooth settings first; if asked for a PIN, enter 0000. Keep the printer nearby and disconnect the phone app before checking its connection.",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 0)
-        });
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 0), FontSize = 12
+        };
+        classicInstructions.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        _classicPanel.Children.Add(classicInstructions);
         var classicActions = new WrapPanel { Margin = new Thickness(0, 18, 0, 12) };
         classicActions.Children.Add(_classicScan); classicActions.Children.Add(_classicCheck);
-        var bluetoothSettings = new Button { Content = "Windows Bluetooth settings", Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+        var bluetoothSettings = new Button { Content = "Windows Bluetooth settings", Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Style = (Style)FindResource("GhostButton") };
         bluetoothSettings.Click += (_, _) =>
         {
             try { Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true }); }
             catch (Exception ex) { _status.Text = $"Could not open Windows Bluetooth settings: {ex.Message}"; }
         };
         _classicPanel.Children.Add(classicActions);
-        _classicPanel.Children.Add(new TextBlock { Text = "Printer", Margin = new Thickness(0, 0, 0, 7) });
+        _classicPanel.Children.Add(DialogLayout.FieldLabel("Printer"));
         _classicPanel.Children.Add(_classicDevices);
         _classicPanel.Children.Add(bluetoothSettings);
         var classicDetails = new Expander { Header = "Connection details", Margin = new Thickness(0, 18, 0, 0) };
@@ -105,7 +103,7 @@ public sealed class PrinterWindow : Window
         _classicPanel.Children.Add(classicDetails);
         panel.Children.Add(_classicPanel);
 
-        _queuePanel.Children.Add(new TextBlock { Text = "Installed printer", Margin = new Thickness(0, 18, 0, 8) });
+        _queuePanel.Children.Add(DialogLayout.FieldLabel("Installed printer", new Thickness(0, 22, 0, 7)));
         _queuePanel.Children.Add(_queues);
         _queueHelp.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         _queuePanel.Children.Add(_queueHelp);
@@ -119,14 +117,15 @@ public sealed class PrinterWindow : Window
         }
         catch (Exception ex) { queueError = ex.Message; }
 
+        _help.SetResourceReference(FrameworkElement.StyleProperty, "MutedText");
         _blePanel.Children.Add(_help);
         var actions = new WrapPanel { Margin = new Thickness(0, 18, 0, 12) };
         actions.Children.Add(_scan); actions.Children.Add(_check);
         _blePanel.Children.Add(actions);
-        _blePanel.Children.Add(new TextBlock { Text = "Printer", Margin = new Thickness(0, 0, 0, 7) });
+        _blePanel.Children.Add(DialogLayout.FieldLabel("Printer"));
         _blePanel.Children.Add(_devices);
         var detailPanel = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-        detailPanel.Children.Add(new TextBlock { Text = "Print channel", Margin = new Thickness(0, 0, 0, 7) });
+        detailPanel.Children.Add(DialogLayout.FieldLabel("Print channel"));
         detailPanel.Children.Add(_targets);
         _channelHelp.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         detailPanel.Children.Add(_channelHelp);
@@ -134,11 +133,18 @@ public sealed class PrinterWindow : Window
         _details.Content = detailPanel;
         _blePanel.Children.Add(_details);
         panel.Children.Add(_blePanel);
-        panel.Children.Add(_status);
+        var statusPanel = new Border { Child = _status, Padding = new Thickness(14, 12, 14, 12), Margin = new Thickness(0, 22, 0, 0), CornerRadius = new CornerRadius(6) };
+        statusPanel.SetResourceReference(Border.BackgroundProperty, "Input");
+        _status.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        panel.Children.Add(statusPanel);
+        _export.SetResourceReference(FrameworkElement.StyleProperty, "GhostButton");
+        _classicExport.SetResourceReference(FrameworkElement.StyleProperty, "GhostButton");
         _save.Style = (Style)FindResource("Primary");
-        var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 22, 0, 0) };
-        footer.Children.Add(new Button { Content = "Cancel", IsCancel = true });
-        footer.Children.Add(_save); panel.Children.Add(footer);
+        var footer = new StackPanel { Orientation = Orientation.Horizontal };
+        footer.Children.Add(DialogLayout.CancelButton());
+        footer.Children.Add(_save);
+        Content = DialogLayout.Create("Printer setup", "Choose a connection for your labels.",
+            new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, footer);
         AutomationProperties.SetName(_mode, "Printer connection");
         AutomationProperties.SetName(_queues, "Installed printer");
         AutomationProperties.SetName(_devices, "Bluetooth LE printer");

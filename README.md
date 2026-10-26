@@ -4,14 +4,14 @@ Print shipping labels from a native Windows workspace, including wireless printi
 
 **[Download for Windows x64](https://github.com/Mxlted/shipping-printer-windows/releases/latest)** · [Printer setup](docs/printers.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-![Shipping Printer in dark mode with an example label](docs/images/workspace-dark.jpg)
+![Shipping Printer in dark mode with label thumbnails and print settings](docs/images/workspace-redesign-dark.jpg)
 
 ## Get started
 
 1. Download the Windows x64 ZIP from the [latest release](https://github.com/Mxlted/shipping-printer-windows/releases/latest).
 2. Extract the entire folder and open `ShippingPrinter.exe`. The .NET runtime is included.
 3. Import a PDF or image, or choose **Try an example label**.
-4. Choose the paper size, open **Printer setup**, and select your printer.
+4. Choose the paper size, then click the printer under **Destination** to open **Printer setup**.
 5. Review the preview and choose **Print label**.
 
 Windows 11 x64 is recommended. Releases are portable and currently unsigned. Keep all files in the extracted folder together. The app targets Windows 10 build 19041 or newer; older Windows versions have not been release-tested.
@@ -78,4 +78,4 @@ Improvements and printer compatibility reports are welcome. The [contribution gu
 
 [MIT](LICENSE). Third-party components retain their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-This is an independent project inspired by the Shipping Printer mobile workflow. It is not affiliated with Shiprinter, OFFNOVA, or AiYin. No original mobile application binaries, source, or assets are distributed here.
+This is an independent project inspired by the Shipping Printer mobile workflow. It is not affiliated with Shiprinter, OFFNOVA, or AiYin. The Windows release package does not include the original mobile application.

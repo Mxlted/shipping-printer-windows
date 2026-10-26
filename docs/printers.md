@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-Shipping Printer can use an installed Windows print queue or connect directly to a compatible Bluetooth printer. Choose the connection in **Printer setup**. Saving a setup or checking a connection does not print anything.
+Shipping Printer can use an installed Windows print queue or connect directly to a compatible Bluetooth printer. Click the printer under **Destination** to open **Printer setup** and choose a connection. Saving a setup or checking a connection does not print anything.
 
 ## Choose a connection
 

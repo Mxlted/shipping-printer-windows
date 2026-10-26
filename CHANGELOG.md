@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 · 2026-10-25
+
+- Redesigned workspace with live label thumbnails, a focused preview canvas, and compact print settings.
+- Printer destination and copies alongside the print action, with consistent light and charcoal appearances.
+- Consistent barcode, crop, and printer dialogs with fixed action areas and improved keyboard focus states.
+
 ## 1.2.0 · 2026-10-25
 
 First public release.

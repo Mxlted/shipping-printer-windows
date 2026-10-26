@@ -62,7 +62,10 @@ public partial class MainWindow : Window
     private void UpdatePreview()
     {
         if (!_ready) return;
-        CountText.Text = $"{_items.Count} label{(_items.Count == 1 ? "" : "s")}";
+        CountText.Text = _items.Count.ToString(CultureInfo.CurrentCulture);
+        DocumentTitle.Text = Selected?.Name ?? "Label preview";
+        DocumentTitle.ToolTip = Selected?.Name;
+        DocumentDetail.Text = Selected is null ? "Select a label to preview its print layout" : $"Label {ItemsList.SelectedIndex + 1} of {_items.Count}  ·  {Selected.Detail}";
         EmptyState.Visibility = Selected is null ? Visibility.Visible : Visibility.Collapsed;
         UpdateActions();
         try
@@ -70,7 +73,7 @@ public partial class MainWindow : Window
             _settings = ReadSettings();
             _rendered = Selected is null ? null : ImageService.RenderLabel(Selected.Image, _settings);
             PreviewImage.Source = _rendered;
-            PreviewInfo.Text = $"{Num(_settings.WidthMm)} × {Num(_settings.HeightMm)} mm  ·  {_settings.Dpi} DPI  ·  Fit to view";
+            PreviewInfo.Text = Selected is null ? "PDF · PNG · JPG · TIFF" : $"{Num(_settings.WidthMm)} × {Num(_settings.HeightMm)} mm  ·  {_settings.Dpi} DPI";
         }
         catch (Exception ex) { _rendered = null; PreviewImage.Source = null; PrintButton.IsEnabled = false; Status(ex.Message); }
     }
@@ -129,6 +132,7 @@ public partial class MainWindow : Window
         var canEdit = Selected is not null && !_busy;
         foreach (var button in new[] { PrintButton, CropButton, RotateLeftButton, RotateRightButton, ResetButton, ExportButton, RemoveButton, ReadBarcodeButton })
             button.IsEnabled = canEdit;
+        ImportButton.IsEnabled = CreateBarcodeButton.IsEnabled = PrinterSetupButton.IsEnabled = !_busy;
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => _operation?.Cancel();
     private async void Window_Drop(object sender, DragEventArgs e) { if (e.Data.GetData(DataFormats.FileDrop) is string[] paths) await ImportPathsAsync(paths); }
@@ -229,9 +233,16 @@ public partial class MainWindow : Window
             Status("Printer setup updated.");
         }
     }
-    private void UpdatePrinterHint() => PrintHint.Text = _printer.IsWireless
-        ? string.IsNullOrEmpty(_printer.DeviceId) ? "Choose your OFFNOVA printer in Printer setup." : $"{(_printer.IsClassic ? "Bluetooth Classic" : "Bluetooth LE")} · {_printer.DeviceName}"
-        : _printer.Mode == "raw" ? "Direct TSPL · " + _printer.PrinterName : "Review the printer dialog before printing.";
+    private void UpdatePrinterHint()
+    {
+        PrinterNameText.Text = _printer.IsWireless
+            ? string.IsNullOrWhiteSpace(_printer.DeviceName) ? (_printer.IsOffnova ? "OFFNOVA N-6140" : "Bluetooth printer") : _printer.DeviceName
+            : string.IsNullOrWhiteSpace(_printer.PrinterName) ? "Windows printer" : _printer.PrinterName;
+        PrintHint.Text = _printer.IsWireless
+            ? string.IsNullOrWhiteSpace(_printer.DeviceId) ? "Select a device to print" : (_printer.IsClassic ? "Bluetooth Classic" : "Bluetooth LE") + " · Saved device"
+            : _printer.Mode == "raw" ? "Direct thermal printing" : "Review in the print dialog";
+        PrinterSetupButton.ToolTip = $"Printer setup\n{PrinterNameText.Text}\n{PrintHint.Text}";
+    }
     private async void Print_Click(object sender, RoutedEventArgs e)
     {
         if (_busy || Selected is null) return;
@@ -265,11 +276,13 @@ public partial class MainWindow : Window
     {
         Application.Current.Resources["UseDarkTitleBar"] = _settings.DarkMode;
         var colors = _settings.DarkMode
-            ? new[] { "#1C1C1C", "#121212", "#F2F2F2", "#ADADAD", "#373737", "#272727", "#333333", "#383838", "#ECECEC", "#171717", "#D1D1D1", "#B0B0B0" }
-            : new[] { "#FFFFFF", "#F2F2F2", "#202020", "#686868", "#DDDDDD", "#F7F7F7", "#ECECEC", "#E7E7E7", "#242424", "#FFFFFF", "#404040", "#666666" };
-        var keys = new[] { "Surface", "Canvas", "Text", "Muted", "Line", "Input", "Hover", "Selected", "Accent", "OnAccent", "AccentHover", "Focus" };
+            ? new[] { "#202020", "#171717", "#EEEEEC", "#A6A6A1", "#353535", "#292929", "#333333", "#343434", "#ECECE7", "#202020", "#D6D6CF", "#B4B4AA", "#1D1D1D", "#353535", "#90908A", "#A3A399" }
+            : new[] { "#FFFFFF", "#F1F1EE", "#262624", "#686863", "#DEDEDA", "#F7F7F5", "#EDEDE9", "#E9E9E4", "#292927", "#FFFFFF", "#454541", "#73736B", "#FAFAF8", "#D3D3CB", "#76766F", "#73736E" };
+        var keys = new[] { "Surface", "Canvas", "Text", "Muted", "Line", "Input", "Hover", "Selected", "Accent", "OnAccent", "AccentHover", "Focus", "Panel", "GridDot", "Subtle", "SelectionEdge" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
-        ThemeButton.Content = _settings.DarkMode ? "Light mode" : "Dark mode";
+        ThemeLabel.Text = _settings.DarkMode ? "Light mode" : "Dark mode";
+        ThemeGlyph.Text = _settings.DarkMode ? "\uE706" : "\uE708";
+        ThemeButton.ToolTip = _settings.DarkMode ? "Switch to light appearance" : "Switch to dark appearance";
     }
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
