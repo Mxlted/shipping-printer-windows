@@ -17,11 +17,13 @@ internal static class Program
 {
     private static readonly List<CheckResult> Results = [];
     private static string Artifacts = "";
+    private static string[] SamplePdfs = [];
 
     [STAThread]
     private static int Main(string[] args)
     {
         Artifacts = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts");
+        SamplePdfs = args.Skip(1).Select(Path.GetFullPath).ToArray();
         Directory.CreateDirectory(Artifacts);
         var previousDataPath = Environment.GetEnvironmentVariable("SHIPPING_PRINTER_DATA");
         Environment.SetEnvironmentVariable("SHIPPING_PRINTER_DATA", Path.Combine(Artifacts, "settings"));
@@ -135,6 +137,40 @@ internal static class Program
             Equal(JsonSerializer.Serialize(settings), JsonSerializer.Serialize(loaded));
             Require(!Directory.EnumerateFiles(SettingsStore.DirectoryPath, "settings.json*.tmp").Any(), "Committed save left a temporary file.");
         });
+        await Check("Legacy shipping margins upgrade once while custom layouts and printer selections survive", () =>
+        {
+            Equal(0d, new PrintSettings().MarginMm);
+            var path = Path.Combine(SettingsStore.DirectoryPath, "settings.json");
+            foreach (var size in new[] { (101.6, 152.4), (100d, 150d) })
+            {
+                var legacy = new PrintSettings { WidthMm = size.Item1, HeightMm = size.Item2, MarginMm = 2, DarkMode = true,
+                    Printer = new PrinterSelection { Mode = "offnova-ble", DeviceId = "ble:public:AABBCCDDEEFF" } };
+                var node = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(legacy))!.AsObject();
+                node.Remove(nameof(PrintSettings.LayoutVersion));
+                File.WriteAllText(path, node.ToJsonString());
+                var loaded = SettingsStore.Load();
+                Equal(0d, loaded.MarginMm); Equal(size.Item1, loaded.WidthMm); Equal(size.Item2, loaded.HeightMm);
+                Equal(true, loaded.DarkMode);
+                Equal(JsonSerializer.Serialize(legacy.Printer), JsonSerializer.Serialize(loaded.Printer));
+                // After upgrading, an intentional 2 mm setting must not be reset again.
+                loaded.MarginMm = 2;
+                SettingsStore.Save(loaded);
+                Equal(2d, SettingsStore.Load().MarginMm);
+            }
+            foreach (var custom in new[]
+            {
+                new PrintSettings { MarginMm = 1.5 },
+                new PrintSettings { MarginMm = 2, OffsetXMm = 1 },
+                new PrintSettings { MarginMm = 2, OffsetYMm = 1 },
+                new PrintSettings { WidthMm = 50, HeightMm = 30, MarginMm = 2 }
+            })
+            {
+                var node = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(custom))!.AsObject();
+                node.Remove(nameof(PrintSettings.LayoutVersion));
+                File.WriteAllText(path, node.ToJsonString());
+                Equal(JsonSerializer.Serialize(custom), JsonSerializer.Serialize(SettingsStore.Load()));
+            }
+        });
         await CheckAsync("Concurrent settings saves use independent temporary files and commit complete JSON", async () =>
         {
             await Task.WhenAll(Enumerable.Range(1, 16).Select(copies => Task.Run(() =>
@@ -157,6 +193,8 @@ internal static class Program
             Equal(101.6, SettingsStore.Load().WidthMm);
             File.WriteAllText(Path.Combine(SettingsStore.DirectoryPath, "settings.json"), "{\"WidthMm\": 0}");
             Equal(101.6, SettingsStore.Load().WidthMm);
+            File.WriteAllText(Path.Combine(SettingsStore.DirectoryPath, "settings.json"), "null");
+            Equal(0d, SettingsStore.Load().MarginMm);
         });
         await Check("Settings bounds reject unsafe raster and printer values", () =>
         {
@@ -217,6 +255,75 @@ internal static class Program
             }
             ImageService.SavePng(pages[0].Image, Path.Combine(Artifacts, "pdf-page-1.png"));
         });
+        await CheckAsync("4x6 PDF borders reach every paper edge at 203 and 300 DPI and survive thermal encoding", async () =>
+        {
+            var path = Path.Combine(Artifacts, "edge-label.pdf");
+            WritePdf(path, "0 0 0 RG\n4 w\n2 2 284 428 re S\n");
+            var page = (await ImageService.ImportAsync(path))[1];
+            Require(page.Detail.Contains("4 × 6 in"), "PDF physical size is missing from the label details.");
+            foreach (int dpi in new[] { 203, 300 })
+            {
+                var settings = new PrintSettings { Dpi = dpi };
+                var bitmap = ImageService.RenderLabel(page.Image, settings);
+                Equal(dpi * 4, bitmap.PixelWidth); Equal(dpi * 6, bitmap.PixelHeight);
+                Equal(new Int32Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight), InkBounds(bitmap));
+                ImageService.SavePng(bitmap, Path.Combine(Artifacts, $"edge-label-{dpi}.png"));
+                var job = TsplEncoder.Encode(bitmap, settings);
+                int rowBytes = (bitmap.PixelWidth + 7) / 8;
+                var marker = Encoding.ASCII.GetBytes($"BITMAP 0,0,{rowBytes},{bitmap.PixelHeight},0,");
+                int rasterStart = job.AsSpan().IndexOf(marker) + marker.Length;
+                Require(rasterStart >= marker.Length, "Full-sized thermal raster header is missing.");
+                Equal((byte)0, job[rasterStart]);
+                Equal((byte)0, job[rasterStart + rowBytes * (bitmap.PixelHeight - 1)]);
+                int lastBit = 0x80 >> ((bitmap.PixelWidth - 1) % 8);
+                Equal(0, job[rasterStart + rowBytes - 1] & lastBit);
+                if (dpi == 203)
+                {
+                    var decoded = DecodeShiprinter(ShiprinterEncoder.Encode(bitmap, settings));
+                    Equal(rowBytes, decoded.RowBytes); Equal(bitmap.PixelHeight, decoded.Height);
+                    Equal((byte)255, decoded.Pixels[0]);
+                    Equal((byte)255, decoded.Pixels[rowBytes * (bitmap.PixelHeight - 1)]);
+                    Equal(lastBit, decoded.Pixels[rowBytes - 1] & lastBit);
+                }
+            }
+        });
+        await Check("Unmatched page proportions and source whitespace are preserved without cropping or stretching", () =>
+        {
+            var settings = new PrintSettings();
+            var wide = ImageService.RenderLabel(MakeBitmap(600, 400, (_, _) => ((byte)0, (byte)0, (byte)0, (byte)255)), settings);
+            var bounds = InkBounds(wide);
+            Equal(0, bounds.X); Equal(812, bounds.Width);
+            Require(Math.Abs(bounds.Height - 812 * 2d / 3) <= 2, "Fit changed the source aspect ratio.");
+            Require(Math.Abs(bounds.Y - (1218 - bounds.Height) / 2d) <= 1, "Fit is not centered on the paper.");
+            var inset = MakeBitmap(400, 600, (x, y) => x >= 20 && x < 380 && y >= 30 && y < 570
+                ? ((byte)0, (byte)0, (byte)0, (byte)255) : ((byte)255, (byte)255, (byte)255, (byte)255));
+            var insetBounds = InkBounds(ImageService.RenderLabel(inset, settings));
+            Require(Math.Abs(insetBounds.X - 40.6) <= 1 && Math.Abs(insetBounds.Y - 60.9) <= 1,
+                "Whitespace already in the source must not be trimmed automatically.");
+        });
+        for (int i = 0; i < SamplePdfs.Length; i++)
+        {
+            int sampleIndex = i + 1;
+            string path = SamplePdfs[i];
+            await CheckAsync($"Supplied 4x6 PDF {sampleIndex} fills the output at both printer resolutions", async () =>
+            {
+                var pages = await ImageService.ImportAsync(path);
+                Equal(1, pages.Count);
+                Equal(1200, pages[0].Image.PixelWidth); Equal(1800, pages[0].Image.PixelHeight);
+                var before = ImageService.RenderLabel(pages[0].Image, new PrintSettings { MarginMm = 2 });
+                var beforeBounds = InkBounds(before);
+                Require(beforeBounds.X > 10 && beforeBounds.Y > 20, "Sample did not reproduce the old extra margin.");
+                ImageService.SavePng(before, Path.Combine(Artifacts, $"sample-{sampleIndex}-before.png"));
+                foreach (int dpi in new[] { 203, 300 })
+                {
+                    var after = ImageService.RenderLabel(pages[0].Image, new PrintSettings { Dpi = dpi });
+                    var bounds = InkBounds(after);
+                    Require(bounds.X <= 1 && bounds.Y <= 1 && after.PixelWidth - bounds.X - bounds.Width <= 1
+                        && after.PixelHeight - bounds.Y - bounds.Height <= 1, "Extra blank space remains around the supplied label.");
+                    ImageService.SavePng(after, Path.Combine(Artifacts, $"sample-{sampleIndex}-after-{dpi}.png"));
+                }
+            });
+        }
         await CheckAsync("Invalid file and PDF content fail without substitute pages", async () =>
         {
             await ThrowsAsync<FileNotFoundException>(() => ImageService.ImportAsync(Path.Combine(Artifacts, "missing-file.png")));
@@ -456,9 +563,20 @@ internal static class Program
         }
         var result = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4); result.Freeze(); return result;
     }
-    private static void WritePdf(string path)
+    private static Int32Rect InkBounds(BitmapSource bitmap)
     {
-        const string contents = "0 0 0 rg\n12 12 60 100 re f\n";
+        var pixels = Pixels(bitmap);
+        int left = bitmap.PixelWidth, top = bitmap.PixelHeight, right = -1, bottom = -1;
+        for (int y = 0; y < bitmap.PixelHeight; y++) for (int x = 0; x < bitmap.PixelWidth; x++)
+        {
+            int p = (y * bitmap.PixelWidth + x) * 4;
+            if (pixels[p] > 50 || pixels[p + 1] > 50 || pixels[p + 2] > 50 || pixels[p + 3] < 250) continue;
+            left = Math.Min(left, x); right = Math.Max(right, x); top = Math.Min(top, y); bottom = Math.Max(bottom, y);
+        }
+        return right < left ? Int32Rect.Empty : new Int32Rect(left, top, right - left + 1, bottom - top + 1);
+    }
+    private static void WritePdf(string path, string contents = "0 0 0 rg\n12 12 60 100 re f\n")
+    {
         string[] objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>",
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 144 216] /Resources << >> /Contents 4 0 R >>",
             $"<< /Length {Encoding.ASCII.GetByteCount(contents)} >>\nstream\n{contents}endstream",

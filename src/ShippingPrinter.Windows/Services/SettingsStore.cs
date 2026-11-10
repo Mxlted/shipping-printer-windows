@@ -18,7 +18,17 @@ public static class SettingsStore
             {
                 if (!File.Exists(path)) return;
                 using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-                value = JsonSerializer.Deserialize<PrintSettings>(stream) ?? new();
+                using var document = JsonDocument.Parse(stream);
+                value = document.Deserialize<PrintSettings>() ?? new();
+                // Older releases added 2 mm to every label. Upgrade that shipping-label
+                // default once; retain other margins and layouts calibrated with offsets.
+                // The version marker also preserves an explicitly chosen 2 mm on later loads.
+                bool shippingSize = (Math.Abs(value.WidthMm - 101.6) < .01 && Math.Abs(value.HeightMm - 152.4) < .01)
+                    || (Math.Abs(value.WidthMm - 100) < .01 && Math.Abs(value.HeightMm - 150) < .01);
+                if (document.RootElement.ValueKind == JsonValueKind.Object
+                    && !document.RootElement.TryGetProperty(nameof(PrintSettings.LayoutVersion), out _)
+                    && shippingSize && value.MarginMm == 2 && value.OffsetXMm == 0 && value.OffsetYMm == 0)
+                    value.MarginMm = 0;
                 value.Validate();
             });
             return value;

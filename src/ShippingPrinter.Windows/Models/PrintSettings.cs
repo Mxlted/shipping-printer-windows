@@ -2,6 +2,7 @@ namespace ShippingPrinter.Windows.Models;
 
 public class PrintSettings
 {
+    public int LayoutVersion { get; set; } = 1;
     public double WidthMm { get; set; } = 101.6;
     public double HeightMm { get; set; } = 152.4;
     public double GapMm { get; set; } = 3;
@@ -13,7 +14,7 @@ public class PrintSettings
     public double OffsetYMm { get; set; }
     public bool Monochrome { get; set; } = true;
     public int Threshold { get; set; } = 160;
-    public double MarginMm { get; set; } = 2;
+    public double MarginMm { get; set; }
     public string PrinterName { get; set; } = "";
     public PrinterSelection Printer { get; set; } = new();
     public bool DarkMode { get; set; }

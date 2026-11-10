@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 · 2026-11-10
+
+- Removed the default 2 mm added margin so matching 4×6 PDFs fill the preview, exported image, and print raster at their full size.
+- Upgraded the old 2 mm default for saved 4×6 and 100×150 mm layouts without offsets. Other margins and offset-calibrated layouts are retained; newly selected margins persist.
+- Show PDF page dimensions and the added print margin in the preview, with a shortcut to remove extra padding. Different page proportions continue to fit without cropping.
+
 ## 1.3.1 · 2026-10-26
 
 - Added a Windows x64 installer with Start menu integration, an optional desktop shortcut, and uninstall support. No administrator access or separate .NET installation is needed.

@@ -73,7 +73,8 @@ public partial class MainWindow : Window
             _settings = ReadSettings();
             _rendered = Selected is null ? null : ImageService.RenderLabel(Selected.Image, _settings);
             PreviewImage.Source = _rendered;
-            PreviewInfo.Text = Selected is null ? "PDF · PNG · JPG · TIFF" : $"{Num(_settings.WidthMm)} × {Num(_settings.HeightMm)} mm  ·  {_settings.Dpi} DPI";
+            var marginInfo = _settings.MarginMm == 0 ? "No added margin" : $"{Num(_settings.MarginMm)} mm added margin";
+            PreviewInfo.Text = Selected is null ? "PDF · PNG · JPG · TIFF" : $"{Num(_settings.WidthMm)} × {Num(_settings.HeightMm)} mm  ·  {_settings.Dpi} DPI  ·  {marginInfo}";
         }
         catch (Exception ex) { _rendered = null; PreviewImage.Source = null; PrintButton.IsEnabled = false; Status(ex.Message); }
     }
@@ -81,6 +82,12 @@ public partial class MainWindow : Window
     private void Error(Exception ex) { Status(ex.Message); MessageBox.Show(this, ex.Message, "Shipping Printer", MessageBoxButton.OK, MessageBoxImage.Warning); }
     private void Setting_Changed(object sender, RoutedEventArgs e) { if (_ready) { _previewTimer.Stop(); _previewTimer.Start(); } }
     private void Threshold_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => Setting_Changed(sender, e);
+    private void RemoveMargin_Click(object sender, RoutedEventArgs e)
+    {
+        MarginBox.Text = "0";
+        _previewTimer.Stop();
+        UpdatePreview();
+    }
     private void Preset_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (!_ready) return;

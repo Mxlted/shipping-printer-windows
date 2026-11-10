@@ -37,6 +37,8 @@ The OFFNOVA BLE workflow is user-reported working. Hardware revisions can differ
 
 **Print label** prints the selected item; **Copies** repeats that item. The workspace is a temporary session, so export any edits you want to keep before closing. Original files are never modified.
 
+For a 4×6 PDF on 4×6 stock, select **Shipping · 4 × 6 in** and leave **Added margin** at **0 mm**. The complete page fills the label without adding a border or cutting off the source artwork. The preview, PNG export, and print output use the same layout. PDFs with different proportions fit inside the paper without cropping; use **Crop** if the file itself contains unwanted whitespace. **Remove added margin** restores 0 mm after a manual adjustment. A printer driver's nonprintable area can still limit ink at the physical edges.
+
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+O` | Import files |
@@ -45,7 +47,7 @@ The OFFNOVA BLE workflow is user-reported working. Hardware revisions can differ
 
 ## Build from source
 
-Use Windows x64, PowerShell 7, and [.NET SDK 10.0.402](https://dotnet.microsoft.com/download/dotnet/10.0), pinned in `global.json`. The first restore needs access to NuGet.
+Use Windows x64, PowerShell 7, and [.NET SDK 10.0.403](https://dotnet.microsoft.com/download/dotnet/10.0), pinned in `global.json`. The first restore needs access to NuGet.
 
 ```powershell
 git clone https://github.com/Mxlted/shipping-printer-windows.git

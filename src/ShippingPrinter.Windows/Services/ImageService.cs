@@ -35,7 +35,7 @@ public static class ImageService
                 stream.Seek(0);
                 using var read = stream.AsStreamForRead();
                 var image = Decode(read);
-                result.Add(new() { Name = $"{Path.GetFileNameWithoutExtension(path)} · {i + 1}", Detail = $"PDF · Page {i + 1} of {pdf.PageCount}", Original = image, Image = image });
+                result.Add(new() { Name = $"{Path.GetFileNameWithoutExtension(path)} · {i + 1}", Detail = $"PDF · Page {i + 1} of {pdf.PageCount} · {page.Size.Width / 96:0.##} × {page.Size.Height / 96:0.##} in", Original = image, Image = image });
             }
         }
         else
@@ -80,6 +80,8 @@ public static class ImageService
         using (var dc = visual.RenderOpen())
         {
             dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
+            // Fit the complete source page into the selected paper. With the default
+            // zero added margin, matching 4×6 pages reach all four edges without cropping.
             var ratio = Math.Min((width - 2 * margin) / source.PixelWidth, (height - 2 * margin) / source.PixelHeight);
             var w = source.PixelWidth * ratio; var h = source.PixelHeight * ratio;
             dc.DrawImage(source, new Rect((width - w) / 2, (height - h) / 2, w, h));
