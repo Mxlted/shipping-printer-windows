@@ -3,7 +3,6 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -61,13 +60,12 @@ public partial class MainWindow : Window
     }
     private void UpdatePreview()
     {
-        if (!_ready) return;
+        if (!_ready || _workspaceUpdating) return;
         CountText.Text = _items.Count.ToString(CultureInfo.CurrentCulture);
-        DocumentTitle.Text = Selected?.Name ?? "Label preview";
+        DocumentTitle.Text = ItemsList.SelectedItems.Count > 1 ? $"{ItemsList.SelectedItems.Count} labels selected" : Selected?.Name ?? "Label preview";
         DocumentTitle.ToolTip = Selected?.Name;
-        DocumentDetail.Text = Selected is null ? "Select a label to preview its print layout" : $"Label {ItemsList.SelectedIndex + 1} of {_items.Count}  ·  {Selected.Detail}";
+        DocumentDetail.Text = Selected is null ? "" : ItemsList.SelectedItems.Count > 1 ? $"Preview: {Selected.Name}" : $"Label {ItemsList.SelectedIndex + 1} of {_items.Count}  ·  {Selected.Detail}";
         EmptyState.Visibility = Selected is null ? Visibility.Visible : Visibility.Collapsed;
-        UpdateActions();
         try
         {
             _settings = ReadSettings();
@@ -76,7 +74,8 @@ public partial class MainWindow : Window
             var marginInfo = _settings.MarginMm == 0 ? "No added margin" : $"{Num(_settings.MarginMm)} mm added margin";
             PreviewInfo.Text = Selected is null ? "PDF · PNG · JPG · TIFF" : $"{Num(_settings.WidthMm)} × {Num(_settings.HeightMm)} mm  ·  {_settings.Dpi} DPI  ·  {marginInfo}";
         }
-        catch (Exception ex) { _rendered = null; PreviewImage.Source = null; PrintButton.IsEnabled = false; Status(ex.Message); }
+        catch (Exception ex) { _rendered = null; PreviewImage.Source = null; Status(ex.Message); }
+        UpdateActions();
     }
     private void Status(string text) => StatusText.Text = text;
     private void Error(Exception ex) { Status(ex.Message); MessageBox.Show(this, ex.Message, "Shipping Printer", MessageBoxButton.OK, MessageBoxImage.Warning); }
@@ -104,6 +103,7 @@ public partial class MainWindow : Window
     public async Task ImportPathsAsync(IEnumerable<string> paths)
     {
         if (_busy) return;
+        var before = CaptureWorkspace();
         SetBusy(true); _operation = new();
         var failures = new List<string>(); var count = 0;
         try
@@ -116,8 +116,14 @@ public partial class MainWindow : Window
                     var items = await ImageService.ImportAsync(path, _operation.Token);
                     var pixels = _items.Concat(items).Sum(x => (long)x.Original.PixelWidth * x.Original.PixelHeight);
                     if (_items.Count + items.Count > 100 || pixels > 64_000_000) throw new ArgumentException("Workspace limit reached (100 labels or 64 megapixels). Remove some labels before importing more.");
-                    foreach (var item in items) { _items.Add(item); count++; }
-                    if (items.Count > 0) ItemsList.SelectedItem = items[0];
+                    _workspaceUpdating = true;
+                    try
+                    {
+                        foreach (var item in items) { _items.Add(item); count++; }
+                        if (items.Count > 0) SelectLabels([items[0]]);
+                    }
+                    finally { _workspaceUpdating = false; }
+                    UpdatePreview();
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex) { failures.Add($"{Path.GetFileName(path)}: {ex.Message}"); }
@@ -126,7 +132,12 @@ public partial class MainWindow : Window
             if (failures.Count > 0) MessageBox.Show(this, string.Join("\n\n", failures.Take(8)), "Import details", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (OperationCanceledException) { Status($"Import cancelled. {count} labels were added."); }
-        finally { _operation.Dispose(); _operation = null; SetBusy(false); UpdatePreview(); }
+        finally
+        {
+            _history.Record("Import labels", before, CaptureWorkspace());
+            _operation.Dispose(); _operation = null; SetBusy(false); UpdatePreview();
+            if (count > 0) FocusLabels();
+        }
     }
     private void SetBusy(bool busy)
     {
@@ -137,30 +148,63 @@ public partial class MainWindow : Window
     private void UpdateActions()
     {
         var canEdit = Selected is not null && !_busy;
-        foreach (var button in new[] { PrintButton, CropButton, RotateLeftButton, RotateRightButton, ResetButton, ExportButton, RemoveButton, ReadBarcodeButton })
+        foreach (var button in new[] { RotateLeftButton, RotateRightButton, RemoveButton })
             button.IsEnabled = canEdit;
+        ResetButton.IsEnabled = canEdit && SelectedLabels.Any(item => !ReferenceEquals(item.Image, item.Original));
+        CropButton.IsEnabled = ReadBarcodeButton.IsEnabled = canEdit && HasSingleSelection;
+        PrintButton.IsEnabled = ExportButton.IsEnabled = canEdit && HasSingleSelection && _rendered is not null;
+        PrintButton.ToolTip = HasSingleSelection ? "Print label (Ctrl+P)" : "Select one label to print";
+        RemoveButton.Content = ItemsList.SelectedItems.Count > 1 ? $"Remove {ItemsList.SelectedItems.Count} labels" : "Remove label";
+        UndoButton.IsEnabled = !_busy && _history.UndoName is not null;
+        RedoButton.IsEnabled = !_busy && _history.RedoName is not null;
+        UndoButton.ToolTip = _history.UndoName is { } undo ? $"Undo: {undo} (Ctrl+Z)" : "Undo (Ctrl+Z)";
+        RedoButton.ToolTip = _history.RedoName is { } redo ? $"Redo: {redo} (Ctrl+Y)" : "Redo (Ctrl+Y)";
         ImportButton.IsEnabled = CreateBarcodeButton.IsEnabled = PrinterSetupButton.IsEnabled = !_busy;
+        EmptyImportButton.IsEnabled = ExampleButton.IsEnabled = !_busy;
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => _operation?.Cancel();
     private async void Window_Drop(object sender, DragEventArgs e) { if (e.Data.GetData(DataFormats.FileDrop) is string[] paths) await ImportPathsAsync(paths); }
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (_busy || Selected is null) return;
-        var index = ItemsList.SelectedIndex; _items.RemoveAt(index); ItemsList.SelectedIndex = Math.Min(index, _items.Count - 1); UpdatePreview();
+        var before = CaptureWorkspace();
+        var removed = SelectedLabels;
+        var index = _items.IndexOf(removed[0]);
+        _workspaceUpdating = true;
+        try
+        {
+            foreach (var item in removed) _items.Remove(item);
+            if (_items.Count > 0) SelectLabels([_items[Math.Min(index, _items.Count - 1)]]);
+        }
+        finally { _workspaceUpdating = false; }
+        _history.Record("Remove labels", before, CaptureWorkspace());
+        UpdatePreview();
+        FocusLabels();
+        Status(removed.Length == 1 ? "Label removed." : $"{removed.Length} labels removed.");
     }
-    private void Edit(Func<BitmapSource, BitmapSource> action)
+    private void Edit(Func<LabelItem, BitmapSource> action, string name)
     {
         if (_busy || Selected is null) return;
-        try { Selected.Image = action(Selected.Image); UpdatePreview(); Status("Label updated."); } catch (Exception ex) { Error(ex); }
+        try
+        {
+            var before = CaptureWorkspace();
+            // Build every result first, so a failed bulk edit changes no labels.
+            var changes = SelectedLabels.Select(item => (Item: item, Image: action(item))).ToArray();
+            foreach (var change in changes) change.Item.Image = change.Image;
+            _history.Record(name, before, CaptureWorkspace());
+            UpdatePreview();
+            Status(changes.Length == 1 ? "Label updated." : $"{changes.Length} labels updated.");
+        }
+        catch (Exception ex) { Error(ex); }
     }
-    private void RotateLeft_Click(object sender, RoutedEventArgs e) => Edit(x => ImageService.Rotate(x, -90));
-    private void RotateRight_Click(object sender, RoutedEventArgs e) => Edit(x => ImageService.Rotate(x, 90));
-    private void Reset_Click(object sender, RoutedEventArgs e) { if (Selected is { } item) Edit(_ => item.Original); }
+    private void RotateLeft_Click(object sender, RoutedEventArgs e) => Edit(item => ImageService.Rotate(item.Image, -90), "Rotate left");
+    private void RotateRight_Click(object sender, RoutedEventArgs e) => Edit(item => ImageService.Rotate(item.Image, 90), "Rotate right");
+    private void Reset_Click(object sender, RoutedEventArgs e) => Edit(item => item.Original, "Reset edits");
     private void Crop_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || Selected is null) return;
+        if (_busy || !HasSingleSelection || Selected is null) return;
         var window = new CropWindow(Selected.Image) { Owner = this };
-        if (window.ShowDialog() == true && window.Result is not null) Edit(_ => window.Result);
+        if (window.ShowDialog() == true && window.Result is not null) Edit(_ => window.Result, "Crop label");
     }
     private void Barcode_Click(object sender, RoutedEventArgs e)
     {
@@ -170,12 +214,19 @@ public partial class MainWindow : Window
     }
     private void AddGenerated(BitmapSource image, string name, string? content)
     {
+        if (_busy) return;
         if (_items.Count >= 100 || _items.Sum(x => (long)x.Original.PixelWidth * x.Original.PixelHeight) + (long)image.PixelWidth * image.PixelHeight > 64_000_000) { Status("Workspace limit reached. Remove labels before adding more."); return; }
+        var before = CaptureWorkspace();
         var item = new LabelItem { Name = name, Detail = "Generated locally", Original = image, Image = image, BarcodeContent = content };
-        _items.Add(item); ItemsList.SelectedItem = item; UpdatePreview(); Status("Label added to workspace.");
+        _workspaceUpdating = true;
+        try { _items.Add(item); SelectLabels([item]); }
+        finally { _workspaceUpdating = false; }
+        _history.Record("Add label", before, CaptureWorkspace());
+        UpdatePreview(); FocusLabels(); Status("Label added.");
     }
     private void Example_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy) return;
         var code = ImageService.Barcode("SAMPLE-001", BarcodeFormat.CODE_128, true);
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
@@ -195,7 +246,7 @@ public partial class MainWindow : Window
     }
     private void ReadBarcode_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is null) return;
+        if (_busy || !HasSingleSelection || Selected is null) return;
         try
         {
             var result = ImageService.DecodeBarcode(Selected.Image);
@@ -208,19 +259,23 @@ public partial class MainWindow : Window
     }
     private void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is null || _busy) return;
+        if (!HasSingleSelection || Selected is null || _busy) return;
         var menu = new ContextMenu();
-        var png = new MenuItem { Header = "Save label as PNG…" }; png.Click += (_, _) => Export(false);
-        var tspl = new MenuItem { Header = "Save thermal commands (.tspl)…" }; tspl.Click += (_, _) => Export(true);
-        menu.Items.Add(png); menu.Items.Add(tspl); menu.PlacementTarget = (Button)sender; menu.IsOpen = true;
+        AddMenuItem(menu, "Save as PNG…", "Ctrl+S", SavePng_Click);
+        AddMenuItem(menu, "Save thermal commands…", "", SaveThermal_Click);
+        menu.PlacementTarget = ExportButton; menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom; menu.IsOpen = true;
     }
     private void Export(bool thermal)
     {
         try
         {
-            if (Selected is null) return;
+            if (_busy || !HasSingleSelection || Selected is null) return;
             var settings = ReadSettings(); var bitmap = ImageService.RenderLabel(Selected.Image, settings);
-            var dialog = new SaveFileDialog { Title = "Export label", FileName = "label", DefaultExt = thermal ? ".tspl" : ".png", Filter = thermal ? "TSPL commands|*.tspl" : "PNG image|*.png" };
+            var name = Selected.Name;
+            if (Path.GetExtension(name).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".tif" or ".tiff" or ".gif")
+                name = Path.GetFileNameWithoutExtension(name);
+            name = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+            var dialog = new SaveFileDialog { Title = "Export label", FileName = string.IsNullOrWhiteSpace(name) ? "label" : name, DefaultExt = thermal ? ".tspl" : ".png", Filter = thermal ? "TSPL commands|*.tspl" : "PNG image|*.png" };
             if (dialog.ShowDialog(this) != true) return;
             if (thermal) File.WriteAllBytes(dialog.FileName, _printer.IsOffnova ? ShiprinterEncoder.Encode(bitmap, settings) : TsplEncoder.Encode(bitmap, settings)); else ImageService.SavePng(bitmap, dialog.FileName);
             Status($"Saved {Path.GetFileName(dialog.FileName)}.");
@@ -252,7 +307,7 @@ public partial class MainWindow : Window
     }
     private async void Print_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || Selected is null) return;
+        if (_busy || !HasSingleSelection || Selected is null) return;
         try
         {
             var settings = ReadSettings();
@@ -290,14 +345,6 @@ public partial class MainWindow : Window
         ThemeLabel.Text = _settings.DarkMode ? "Light mode" : "Dark mode";
         ThemeGlyph.Text = _settings.DarkMode ? "\uE706" : "\uE708";
         ThemeButton.ToolTip = _settings.DarkMode ? "Switch to light appearance" : "Switch to dark appearance";
-    }
-    private void Window_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (Keyboard.Modifiers != ModifierKeys.Control) return;
-        if (e.Key == Key.O) { Import_Click(sender, e); e.Handled = true; }
-        else if (e.Key == Key.P) { Print_Click(sender, e); e.Handled = true; }
-        else if (e.Key == Key.V && Keyboard.FocusedElement is not TextBox && !_busy && Clipboard.ContainsImage())
-        { var image = Clipboard.GetImage(); if (image is not null) AddGenerated(image, "Clipboard image", null); e.Handled = true; }
     }
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {

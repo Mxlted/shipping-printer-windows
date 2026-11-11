@@ -41,16 +41,17 @@
       <Button x:Name="CreateBarcodeButton" AutomationProperties.Name="Create barcode" Style="{StaticResource GhostButton}" Click="Barcode_Click" Margin="2,0,2,20" HorizontalContentAlignment="Left" Padding="12,8"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED14;" Margin="0,0,10,0" VerticalAlignment="Center"/><TextBlock Text="Create barcode"/></StackPanel></Button>
      </StackPanel>
      <StackPanel DockPanel.Dock="Bottom" Margin="6,12,6,18">
-      <Button x:Name="RemoveButton" Content="Remove selected" Style="{StaticResource GhostButton}" Click="Remove_Click" HorizontalContentAlignment="Left" Padding="8,8" Margin="-4,0,0,14"/>
+      <Button x:Name="RemoveButton" Content="Remove label" Style="{StaticResource GhostButton}" Click="Remove_Click" HorizontalContentAlignment="Left" Padding="8,8" Margin="-4,0,0,14" ToolTip="Remove from workspace (Delete)"/>
       <Border Height="1" Background="{DynamicResource Line}" Margin="0,0,0,14"/>
-      <TextBlock Text="A workspace for this session" FontSize="11" Foreground="{DynamicResource Muted}"/>
-      <TextBlock Text="Export edited labels to keep them." FontSize="11" Foreground="{DynamicResource Subtle}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+      <TextBlock Text="Session workspace" FontSize="11" Foreground="{DynamicResource Muted}"/>
+      <TextBlock Text="Original files stay unchanged." FontSize="11" Foreground="{DynamicResource Subtle}" Margin="0,5,0,0"/>
      </StackPanel>
      <Grid>
-      <TextBlock Text="Your imported labels appear here." Margin="8,12" HorizontalAlignment="Left">
+      <TextBlock Text="No labels yet" Margin="8,12" HorizontalAlignment="Left">
        <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding ElementName=ItemsList, Path=Items.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
       </TextBlock>
-      <ListBox x:Name="ItemsList" SelectionChanged="Items_SelectionChanged" AutomationProperties.Name="Labels" Padding="0">
+      <ListBox x:Name="ItemsList" SelectionMode="Extended" SelectionChanged="Items_SelectionChanged" AutomationProperties.Name="Labels" Padding="0" PreviewMouseRightButtonDown="Items_RightButtonDown" ContextMenuOpening="WorkspaceMenu_Opening">
+       <ListBox.ContextMenu><ContextMenu/></ListBox.ContextMenu>
        <ListBox.ItemTemplate><DataTemplate>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
          <Border Background="White" BorderBrush="#D9D9D5" BorderThickness="1" CornerRadius="2" Width="42" Height="56" Padding="3"><Image Source="{Binding Image}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
@@ -66,9 +67,10 @@
     <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition/><RowDefinition Height="66"/></Grid.RowDefinitions>
     <Grid Margin="24,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel VerticalAlignment="Center"><TextBlock x:Name="DocumentTitle" Text="Label preview" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="DocumentDetail" Text="Select a label to preview its print layout" Foreground="{DynamicResource Muted}" FontSize="11" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
-     <Button x:Name="ExportButton" Grid.Column="1" Content="Export  ↓" Click="Export_Click" Style="{StaticResource GhostButton}" Margin="16,0,0,0" VerticalAlignment="Center"/>
+     <Button x:Name="ExportButton" Grid.Column="1" Content="Export  ↓" Click="Export_Click" Style="{StaticResource GhostButton}" Margin="16,0,0,0" VerticalAlignment="Center" ToolTip="Export label (Ctrl+S)"/>
     </Grid>
-    <Grid Grid.Row="1" Margin="16,0">
+    <Grid x:Name="PreviewSurface" Grid.Row="1" Margin="16,0" Focusable="True" Background="Transparent" MouseDown="Preview_MouseDown" ContextMenuOpening="WorkspaceMenu_Opening" AutomationProperties.Name="Label preview">
+     <Grid.ContextMenu><ContextMenu/></Grid.ContextMenu>
      <Border CornerRadius="8" BorderBrush="{DynamicResource Line}" BorderThickness="1">
       <Border.Background><DrawingBrush TileMode="Tile" Viewport="0,0,20,20" ViewportUnits="Absolute" Viewbox="0,0,20,20" ViewboxUnits="Absolute"><DrawingBrush.Drawing><DrawingGroup><GeometryDrawing Brush="{DynamicResource Canvas}" Geometry="M0,0 H20 V20 H0 Z"/><GeometryDrawing Brush="{DynamicResource GridDot}"><GeometryDrawing.Geometry><EllipseGeometry Center="10,10" RadiusX="0.65" RadiusY="0.65"/></GeometryDrawing.Geometry></GeometryDrawing></DrawingGroup></DrawingBrush.Drawing></DrawingBrush></Border.Background>
      </Border>
@@ -80,22 +82,24 @@
         <Border Width="84" Height="112" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource SelectionEdge}" BorderThickness="1" CornerRadius="5" RenderTransformOrigin="0.5,0.5" Margin="0,14,16,0"><Border.RenderTransform><RotateTransform Angle="-7"/></Border.RenderTransform><Canvas Margin="12,14"><Path Data="M0,0 H26 M0,7 H42 M0,24 H53" Stroke="{DynamicResource Muted}" StrokeThickness="2"/><Path Data="M0,48 V72 M4,48 V72 M10,48 V72 M13,48 V72 M20,48 V72 M27,48 V72 M31,48 V72 M37,48 V72 M43,48 V72 M47,48 V72 M53,48 V72" Stroke="{DynamicResource Text}" StrokeThickness="2"/></Canvas></Border>
        </Grid>
        <TextBlock Text="Add a label to begin" FontSize="24" FontWeight="SemiBold" TextAlignment="Center"/>
-       <TextBlock Text="Drop a PDF or image into the workspace.&#x0a;Each page becomes a label, ready to print." Style="{StaticResource MutedText}" FontSize="13" TextAlignment="Center" Margin="0,12,0,22"/>
-       <Button Content="Import files" Style="{StaticResource Primary}" Click="Import_Click" HorizontalAlignment="Center" Padding="24,10" Margin="0"/>
-       <Button Content="Try an example label  →" Style="{StaticResource GhostButton}" Click="Example_Click" HorizontalAlignment="Center" Margin="0,10,0,0" FontSize="12"/>
+       <TextBlock Text="Drop a PDF or image here" Style="{StaticResource MutedText}" FontSize="13" TextAlignment="Center" Margin="0,12,0,22"/>
+       <Button x:Name="EmptyImportButton" Content="Import files" Style="{StaticResource Primary}" Click="Import_Click" HorizontalAlignment="Center" Padding="24,10" Margin="0"/>
+       <Button x:Name="ExampleButton" Content="Try an example label  →" Style="{StaticResource GhostButton}" Click="Example_Click" HorizontalAlignment="Center" Margin="0,10,0,0" FontSize="12"/>
       </StackPanel>
      </Grid>
      <TextBlock x:Name="PreviewInfo" Text="PDF · PNG · JPG · TIFF" Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,17"/>
     </Grid>
     <Grid Grid.Row="2" Margin="20,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-      <Button x:Name="CropButton" AutomationProperties.Name="Crop label" Style="{StaticResource ToolbarButton}" Click="Crop_Click" ToolTip="Crop label"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7A8;" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBlock Text="Crop"/></StackPanel></Button>
+      <Button x:Name="CropButton" AutomationProperties.Name="Crop label" Style="{StaticResource ToolbarButton}" Click="Crop_Click" ToolTip="Crop label (Ctrl+Shift+X)"><StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7A8;" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBlock Text="Crop"/></StackPanel></Button>
       <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="4,0,8,0"/>
-      <Button x:Name="RotateLeftButton" Content="&#xE7AD;" Style="{StaticResource IconButton}" Click="RotateLeft_Click" ToolTip="Rotate left" AutomationProperties.Name="Rotate left"><Button.LayoutTransform><ScaleTransform ScaleX="-1"/></Button.LayoutTransform></Button>
-      <Button x:Name="RotateRightButton" Content="&#xE7AD;" Style="{StaticResource IconButton}" Click="RotateRight_Click" ToolTip="Rotate right" AutomationProperties.Name="Rotate right"/>
-      <Button x:Name="ResetButton" Content="Reset" Style="{StaticResource ToolbarButton}" Click="Reset_Click" Margin="6,0,0,0"/>
+      <Button x:Name="RotateLeftButton" Content="&#xE7AD;" Style="{StaticResource IconButton}" Click="RotateLeft_Click" ToolTip="Rotate left (Ctrl+[)" AutomationProperties.Name="Rotate left"><Button.LayoutTransform><ScaleTransform ScaleX="-1"/></Button.LayoutTransform></Button>
+      <Button x:Name="RotateRightButton" Content="&#xE7AD;" Style="{StaticResource IconButton}" Click="RotateRight_Click" ToolTip="Rotate right (Ctrl+])" AutomationProperties.Name="Rotate right"/>
+      <Button x:Name="ResetButton" Content="Reset" Style="{StaticResource ToolbarButton}" Click="Reset_Click" Margin="6,0,0,0" ToolTip="Reset edits"/>
+      <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="8,0"/>
+      <Button x:Name="UndoButton" Content="&#xE7A7;" Style="{StaticResource IconButton}" Click="Undo_Click" ToolTip="Undo (Ctrl+Z)" AutomationProperties.Name="Undo"/>
+      <Button x:Name="RedoButton" Content="&#xE7A6;" Style="{StaticResource IconButton}" Click="Redo_Click" ToolTip="Redo (Ctrl+Y)" AutomationProperties.Name="Redo"/>
      </StackPanel>
-     <TextBlock Grid.Column="1" Text="Fit to view" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center"/>
     </Grid>
    </Grid>
    <!-- Settings and a pinned destination beside the print action. -->
@@ -120,7 +124,6 @@
        <ComboBox x:Name="PresetBox" SelectionChanged="Preset_Changed" AutomationProperties.Name="Paper preset"><ComboBoxItem Content="Shipping · 4 × 6 in"/><ComboBoxItem Content="Shipping · 100 × 150 mm"/><ComboBoxItem Content="Small · 50 × 30 mm"/><ComboBoxItem Content="Square · 100 × 100 mm"/><ComboBoxItem Content="Custom size"/></ComboBox>
        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Width · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="WidthBox" LostFocus="Setting_Changed" AutomationProperties.Name="Width mm"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Height · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HeightBox" LostFocus="Setting_Changed" AutomationProperties.Name="Height mm"/></StackPanel></Grid>
        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Added margin · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="MarginBox" LostFocus="Setting_Changed" AutomationProperties.Name="Added margin mm" ToolTip="Extra space added inside the paper. Use 0 for a PDF that already matches the label size."/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Resolution" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="DpiBox" SelectionChanged="Setting_Changed" AutomationProperties.Name="Resolution"><ComboBoxItem Content="203 DPI"/><ComboBoxItem Content="300 DPI"/></ComboBox></StackPanel></Grid>
-       <TextBlock Text="Matching PDFs fill the label at 0 mm. Other page shapes fit without cropping." Style="{StaticResource MutedText}" FontSize="11" Margin="0,10,0,0"/>
        <Button Content="Remove added margin" Style="{StaticResource GhostButton}" Click="RemoveMargin_Click" HorizontalContentAlignment="Left" Padding="0,7" Margin="0,3,0,0" FontSize="12"/>
        <Border Style="{StaticResource Divider}"/>
        <TextBlock Text="Image" Style="{StaticResource Section}" Margin="0,18,0,6"/>
@@ -129,7 +132,6 @@
        <Button x:Name="ReadBarcodeButton" Content="Read barcode" Style="{StaticResource GhostButton}" Click="ReadBarcode_Click" HorizontalContentAlignment="Left" Padding="0,7" Margin="0,7,0,0" FontSize="12"/>
        <Border Style="{StaticResource Divider}" Margin="0,14,0,0"/>
        <Expander Header="Thermal options" Margin="0,17,0,0"><StackPanel Margin="0,14,0,0">
-        <TextBlock Text="Settings for direct thermal printing. Offsets move the output on paper." Style="{StaticResource MutedText}" Margin="0,0,0,14"/>
         <TextBlock Text="Label gap · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GapBox" LostFocus="Setting_Changed" AutomationProperties.Name="Gap mm"/>
         <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Density · 1–15" Style="{StaticResource FieldLabel}"/><TextBox x:Name="DensityBox" LostFocus="Setting_Changed" AutomationProperties.Name="Density"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Speed · 1–8" Style="{StaticResource FieldLabel}"/><TextBox x:Name="SpeedBox" LostFocus="Setting_Changed" AutomationProperties.Name="Speed"/></StackPanel></Grid>
         <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="X offset · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="OffsetXBox" LostFocus="Setting_Changed" AutomationProperties.Name="X offset mm"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Y offset · mm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="OffsetYBox" LostFocus="Setting_Changed" AutomationProperties.Name="Y offset mm"/></StackPanel></Grid>
@@ -140,7 +142,7 @@
    </Border>
   </Grid>
   <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="22,0" Background="{DynamicResource Panel}">
-   <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" Text="Ready to import" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><StackPanel Grid.Column="1" Orientation="Horizontal"><Button x:Name="CancelButton" Content="Cancel" Visibility="Collapsed" Padding="10,2" Click="Cancel_Click" FontSize="11"/><TextBlock Text="Ctrl O  Import     /     Ctrl P  Print" Foreground="{DynamicResource Subtle}" FontSize="10" VerticalAlignment="Center" Margin="18,0,0,0"/></StackPanel></Grid>
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><Button x:Name="CancelButton" Grid.Column="1" Content="Cancel" Visibility="Collapsed" Padding="10,2" Click="Cancel_Click" FontSize="11" ToolTip="Cancel (Esc)"/></Grid>
   </Border>
  </Grid>
 </Window>

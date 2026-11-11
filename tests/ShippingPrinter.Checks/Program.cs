@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -66,6 +67,90 @@ internal static class Program
 
     private static async Task RunChecksAsync()
     {
+        await Check("Workspace undo restores removed PDF pages, edits, order and selection without touching the file", async () =>
+        {
+            var path = Path.Combine(Artifacts, "workspace-history.pdf");
+            WritePdf(path);
+            var sourceBytes = File.ReadAllBytes(path);
+            var pages = await ImageService.ImportAsync(path);
+            var extra = new LabelItem { Name = pages[0].Name, Detail = "Duplicate name", Image = pages[0].Image, Original = pages[0].Original };
+            var items = new ObservableCollection<LabelItem>([pages[0], extra, pages[1]]);
+            pages[1].Image = ImageService.Rotate(pages[1].Image, 90);
+            var editedPixels = Pixels(pages[1].Image);
+            var history = new WorkspaceHistory();
+            var before = WorkspaceHistory.Capture(items, [pages[0], pages[1]]);
+            items.Remove(pages[0]); items.Remove(pages[1]);
+            history.Record("Remove labels", before, WorkspaceHistory.Capture(items, [extra]));
+            var restored = history.Undo()!;
+            restored.Restore(items);
+            Require(items.SequenceEqual(new[] { pages[0], extra, pages[1] }), "Nonadjacent pages must return to their original positions, even with duplicate names.");
+            Require(restored.Selection.SequenceEqual(pages), "Undo must restore the original selection.");
+            Require(Pixels(items[2].Image).SequenceEqual(editedPixels), "Undo removal must retain prior image edits.");
+            history.Redo()!.Restore(items);
+            Require(items.SequenceEqual(new[] { extra }), "Redo must remove the same pages.");
+            Require(File.ReadAllBytes(path).SequenceEqual(sourceBytes), "Workspace changes must leave the source PDF untouched.");
+        });
+        await Check("Workspace history restores a bulk edit and branches after a new import", () =>
+        {
+            var image = MakeBitmap(8, 5, (x, y) => ((byte)(x * 20), (byte)(y * 30), (byte)0, (byte)255));
+            var first = new LabelItem { Name = "First", Detail = "", Image = image, Original = image };
+            var second = new LabelItem { Name = "Second", Detail = "", Image = image, Original = image };
+            var items = new ObservableCollection<LabelItem>([first, second]);
+            var history = new WorkspaceHistory();
+            var before = WorkspaceHistory.Capture(items, items);
+            foreach (var item in items) item.Image = ImageService.Rotate(item.Image, 90);
+            history.Record("Rotate right", before, WorkspaceHistory.Capture(items, items));
+            history.Undo()!.Restore(items);
+            Require(items.All(item => Pixels(item.Image).SequenceEqual(Pixels(image))), "One undo must restore every edited label.");
+            // Changing only selection must not consume history or discard redo.
+            history.Record("Selection", WorkspaceHistory.Capture(items, [first]), WorkspaceHistory.Capture(items, [second]));
+            Equal("Rotate right", history.RedoName);
+            history.Redo()!.Restore(items);
+            Require(items.All(item => item.Image.PixelWidth == 5 && item.Image.PixelHeight == 8), "Redo must reapply the entire bulk edit.");
+            history.Undo()!.Restore(items);
+            var branch = WorkspaceHistory.Capture(items, [first]);
+            var third = new LabelItem { Name = "Third", Detail = "", Image = image, Original = image };
+            items.Add(third);
+            history.Record("Import labels", branch, WorkspaceHistory.Capture(items, [third]));
+            Equal<string?>(null, history.RedoName);
+            history.Undo()!.Restore(items);
+            Require(items.SequenceEqual(new[] { first, second }), "Undo import must remove only the newly imported labels.");
+        });
+        await Check("Workspace history keeps recent actions within its step limit", () =>
+        {
+            var items = new ObservableCollection<LabelItem>();
+            var image = MakeBitmap(2, 3);
+            var history = new WorkspaceHistory();
+            for (var i = 0; i < 25; i++)
+            {
+                var before = WorkspaceHistory.Capture(items, []);
+                items.Add(new LabelItem { Name = i.ToString(), Detail = "", Image = image, Original = image });
+                history.Record("Add label", before, WorkspaceHistory.Capture(items, []));
+            }
+            var steps = 0;
+            while (history.Undo() is { } snapshot) { snapshot.Restore(items); steps++; }
+            Equal(20, steps); Equal(5, items.Count);
+            while (history.Redo() is { } snapshot) snapshot.Restore(items);
+            Equal(25, items.Count);
+        });
+        await Check("Large workspace snapshots shorten history without losing the latest action", () =>
+        {
+            var original = MakeBitmap(1000, 1000);
+            var rotated = ImageService.Rotate(original, 90);
+            var items = new ObservableCollection<LabelItem>(Enumerable.Range(0, 16)
+                .Select(i => new LabelItem { Name = i.ToString(), Detail = "", Original = original, Image = original }));
+            var history = new WorkspaceHistory();
+            for (var i = 0; i < 10; i++)
+            {
+                var before = WorkspaceHistory.Capture(items, items);
+                foreach (var item in items) item.Image = i % 2 == 0 ? rotated : original;
+                history.Record("Edit labels", before, WorkspaceHistory.Capture(items, items));
+            }
+            var steps = 0;
+            while (history.Undo() is { } snapshot) { snapshot.Restore(items); steps++; }
+            Equal(2, steps);
+            Equal(16, items.Count);
+        });
         await Check("QR payload round trip, including Unicode", () =>
         {
             const string content = "Shipping Printer | café | Label 002194";
